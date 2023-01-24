@@ -1,0 +1,28 @@
+//-*- coding: utf-8 -*-
+plugins {
+  id "org.sonarqube" version "3.4.0.2513"
+}
+
+subprojects{
+   group 'se.laz.casual'
+   version '1.0.0-SNAPSHOT'
+   apply from: "$rootProject.projectDir/versions.gradle"
+   repositories {
+      mavenCentral()
+      mavenLocal()
+   }
+   tasks.withType(JavaCompile) {
+      sourceCompatibility = JavaVersion.VERSION_11
+      targetCompatibility = JavaVersion.VERSION_11
+      compileJava {
+         options.encoding = 'UTF-8'
+         options.compilerArgs << '-parameters' << "-Xlint:all" << "-Werror"
+      }
+   }
+   tasks.withType(Test){
+      compileTestJava {
+         options.encoding = 'UTF-8'
+      }
+    }
+    apply plugin: 'org.sonarqube'
+}

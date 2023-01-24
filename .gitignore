@@ -1,0 +1,12 @@
+[Bb]uild/
+ObjectStore/
+.idea/
+*.iml
+*.class
+*.jar
+.gradle/
+# emacs #
+*~
+*.orig
+dist/
+out/

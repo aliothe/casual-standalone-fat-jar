@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) 2017 - 2018, The casual project. All rights reserved.
+ *
+ * This software is licensed under the MIT license, https://opensource.org/licenses/MIT
+ */
+
+//-*- coding: utf-8 -*-
+plugins {
+    id 'java-library'
+    id 'jacoco'
+    id 'groovy'
+}
+
+defaultTasks 'build'
+
+test{
+    useJUnitPlatform()
+    testLogging {
+	events "passed", "skipped", "failed"
+    }
+}
+
+dependencies {
+  compileOnly libs.netty
+  compileOnly project(':ext:casual-api')
+
+  testImplementation libs.netty
+  testImplementation project(':ext:casual-api')  
+
+  // for spock
+  testImplementation libs.groovy_all
+  testImplementation libs.spock_core
+  testImplementation libs.junit4
+  testImplementation libs.cglib_nodep
+  testImplementation libs.objenesis
+}

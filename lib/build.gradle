@@ -1,0 +1,43 @@
+//-*- coding: utf-8 -*-
+plugins {
+    id 'groovy'
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    api project(':ext:casual-api')
+    api project(':ext:casual-network-protocol')
+    api project(':ext:casual-network-api')
+    api project(':ext:casual-network')
+    compileOnly 'javax.transaction:transaction-api:1.1'
+
+    
+    // for spock
+    testImplementation libs.groovy_all
+    testImplementation libs.spock_core
+    testImplementation libs.junit4
+    testImplementation libs.cglib_nodep
+    testImplementation libs.system_lambda
+}
+
+tasks.named('test') {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
+}
+
+jar {
+    // create fat jar
+    duplicatesStrategy = 'include'
+    from {
+        configurations.runtimeClasspath.collect {
+            if(it.name.contains('casual')){
+		return it.isDirectory() ? it : zipTree(it)
+           }
+        }
+    }
+    archiveBaseName = 'casual-standalone-fat-jar'
+}

@@ -1,0 +1,22 @@
+
+def netty_version = '4.1.86.Final'
+
+ext.libs = [
+  netty: 'io.quarkus:quarkus-netty:2.15.3.Final',
+  netty_epoll: "io.netty:netty-transport-native-epoll:${netty_version}",
+  gson: 'com.google.code.gson:gson:2.9.0',
+  jta: 'io.quarkus:quarkus-narayana-jta',
+  // test
+  junit4: 'junit:junit:4.13.2',
+  hamcrest_all: 'org.hamcrest:hamcrest-all:1.3',
+  commons_io: 'commons-io:commons-io:2.11.0',
+  system_lambda: 'com.github.stefanbirkner:system-lambda:1.2.0',
+  // for spock
+  groovy_all: 'org.codehaus.groovy:groovy:3.0.13',
+  //spock_bom: 'org.spockframework:spock-core:2.2-groovy-3.0',
+  spock_core: 'org.spockframework:spock-core:2.2-groovy-3.0',
+  spock_junit4: 'org.spockframework:spock-junit4',
+  byte_buddy: 'net.bytebuddy:byte-buddy:1.12.8',
+  cglib_nodep: 'cglib:cglib-nodep:3.3.0',
+  objenesis: 'org.objenesis:objenesis:3.2'
+]
