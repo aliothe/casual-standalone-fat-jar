@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2017 - 2022, The casual project. All rights reserved.
+ *
+ * This software is licensed under the MIT license, https://opensource.org/licenses/MIT
+ */
+
 package se.laz.casual.standalone;
 
 import se.laz.casual.api.flags.Flag;
@@ -217,7 +223,7 @@ public class CasualXAResource implements XAResource
         LOG.finest(()-> String.format("start, xid: %s ( %s ) flag: %d ", PrettyPrinter.casualStringify(xid), xid, i));
         if(null == xid)
         {
-            LOG.warning(()-> String.format("start, xid is null!"));
+            LOG.warning(()-> "start, xid is null!");
             throw new XAException(XAException.XAER_PROTO);
         }
         if(currentXid != null)

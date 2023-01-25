@@ -15,16 +15,16 @@ import java.util.concurrent.Executors;
 
 public final class EventLoopFactory
 {
-    private static EventLoopGroup INSTANCE;
+    private static EventLoopGroup instance;
     private EventLoopFactory()
     {}
     public synchronized EventLoopGroup getInstance()
     {
-        if(null == INSTANCE)
+        if(null == instance)
         {
-            INSTANCE = createEventLoopGroup();
+            instance = createEventLoopGroup();
         }
-        return INSTANCE;
+        return instance;
     }
 
     private EventLoopGroup createEventLoopGroup()

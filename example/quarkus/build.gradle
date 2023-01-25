@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-resteasy-reactive'
+    implementation 'io.quarkus:quarkus-narayana-jta'
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-hibernate-orm'
+    implementation 'io.quarkus:quarkus-jdbc-h2'
+    implementation 'io.quarkus:quarkus-resteasy-reactive-jackson'
+    implementation 'io.quarkus:quarkus-agroal'
+    implementation 'commons-io:commons-io:2.11.0'
+
+    // workaround for https://github.com/quarkusio/quarkus/issues/19970
+    compileOnly 'org.osgi:osgi.annotation:7.0.0'
+
+    // the casual fat jar
+    implementation files("../../lib/build/libs/casual-standalone-fat-jar-${versions.casual_standalone_version}.jar")
+    
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+}

@@ -1,0 +1,19 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    plugins {
+        id "${quarkusPluginId}" version "${quarkusPluginVersion}"
+    }
+}
+rootProject.name='casual-quarkus'
+/*
+include 'ext:casual-api'
+include 'ext:casual-network-protocol'
+include 'ext:casual-network-api'
+include 'ext:casual-network'
+include 'ext:standalone'
+*/
+include 'quarkus'

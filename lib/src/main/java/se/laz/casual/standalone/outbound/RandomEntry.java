@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2023, The casual project. All rights reserved.
+ *
+ * This software is licensed under the MIT license, https://opensource.org/licenses/MIT
+ */
 package se.laz.casual.standalone.outbound;
 
 import java.util.List;
@@ -37,6 +42,8 @@ public final class RandomEntry
      * @param max
      * @return a pseudorandom number within the range [min, max-1]
      */
+    // Pseudo random is fine here
+    @SuppressWarnings("java:S2245")
     private static int getRandomNumber(int min, int max)
     {
         return ThreadLocalRandom.current().nextInt(min, max);

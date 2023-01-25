@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2023, The casual project. All rights reserved.
+ *
+ * This software is licensed under the MIT license, https://opensource.org/licenses/MIT
+ */
+
 package se.laz.casual.standalone.outbound;
 
 import se.laz.casual.network.outbound.NetworkListener;
@@ -29,8 +35,8 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
     }
 
     public static CasualManagedConnection of(TransactionManager transactionManager,
-                                                           String host,
-                                                           int port)
+                                             String host,
+                                             int port)
     {
         Objects.requireNonNull(transactionManager, "transactionManager can not be null");
         Objects.requireNonNull(host, "host can not be null");
@@ -65,7 +71,7 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
     @Override
     public void close()
     {
-        getCaller().ifPresent(caller -> caller.close());
+        getCaller().ifPresent(Caller::close);
     }
 
     @Override
