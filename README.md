@@ -1,5 +1,10 @@
 # casual fat jar
 
+## Prerequisites
+
+* JDK 11
+* Some casual or java application server running application(s) with exported service(s).
+
 ## Motivation
 
 Enables application XA communication with casual without having to run in an application server.
