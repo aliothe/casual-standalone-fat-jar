@@ -6,6 +6,7 @@
 
 package se.laz.casual.standalone.outbound;
 
+import se.laz.casual.jca.DomainId;
 import se.laz.casual.network.api.NetworkConnection;
 import se.laz.casual.standalone.CasualXAResource;
 
@@ -16,14 +17,14 @@ import java.util.UUID;
 public class CasualConnection
 {
     private final NetworkConnection networkConnection;
-    private final UUID id;
+    private final DomainId id;
     private CasualXAResource casualXAResource;
     private int timeout;
 
     private CasualConnection(NetworkConnection networkConnection)
     {
         this.networkConnection = networkConnection;
-        this.id = networkConnection.getId();
+        this.id = networkConnection.getDomainId();
     }
 
     public CasualConnection setCasualXAResource(CasualXAResource casualXAResource)
@@ -64,7 +65,7 @@ public class CasualConnection
         return casualXAResource.getCurrentXid();
     }
 
-    public UUID getId()
+    public DomainId getId()
     {
         return id;
     }

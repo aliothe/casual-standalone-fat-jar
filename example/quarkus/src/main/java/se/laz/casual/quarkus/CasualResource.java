@@ -18,8 +18,10 @@ import se.laz.casual.api.flags.ServiceReturnState;
 import se.laz.casual.quarkus.db.Fruit;
 import se.laz.casual.standalone.outbound.Caller;
 import se.laz.casual.standalone.outbound.CasualManagedConnection;
-import se.laz.casual.standalone.outbound.CasualManagedConnectionProducer;
 import se.laz.casual.standalone.outbound.ServiceCallFailedException;
+import se.laz.casual.standalone.outbound.ManagedConnectionPool;
+import se.laz.casual.standalone.outbound.Address;
+import se.laz.casual.api.CasualRuntimeException;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
@@ -50,9 +52,10 @@ import java.util.logging.Logger;
 public class CasualResource
 {
     private static final Logger LOG = Logger.getLogger(CasualResource.class.getName());
-    private CasualManagedConnection managedConnection;
     TransactionManager transactionManager;
     EntityManager entityManager;
+    String host;
+    int port;
 
     @Inject
     public CasualResource(
@@ -63,7 +66,8 @@ public class CasualResource
     {
         this.transactionManager = transactionManager;
         this.entityManager = entityManager;
-        managedConnection = CasualManagedConnectionProducer.create(() -> transactionManager, host, Integer.parseInt(port));
+        this.host = host;
+        this.port = Integer.parseInt(port);
     }
 
     @GET
@@ -165,19 +169,26 @@ public class CasualResource
     @PreDestroy
     public void goingAway()
     {
-        LOG.warning(() -> "Bean going away, closing caller");
-        managedConnection.close();
+        LOG.warning(() -> "Bean going away, doing nothing");
     }
 
     private CasualBuffer makeCasualCall(CasualBuffer msg, String serviceName, Flag<AtmiFlags> flags)
     {
-        Caller caller = managedConnection.getCaller().orElseThrow(() -> new RuntimeException("currently no caller, either never connected or disconnected and not yet reconnected"));
-        ServiceReturn<CasualBuffer> reply = caller.tpcall(serviceName, msg, flags);
-        if(reply.getServiceReturnState() == ServiceReturnState.TPSUCCESS)
+        try(CasualManagedConnection managedConnection = getManagedConnection(Address.of(host, port), ()-> transactionManager))
         {
-            return reply.getReplyBuffer();
+            Caller caller = managedConnection.getCaller().orElseThrow(() -> new CasualRuntimeException("currently no caller, either never connected or disconnected and not yet reconnected"));
+            ServiceReturn<CasualBuffer> reply = caller.tpcall(serviceName, msg, flags);
+            if(reply.getServiceReturnState() == ServiceReturnState.TPSUCCESS)
+            {
+                return reply.getReplyBuffer();
+            }
+            throw new ServiceCallFailedException("tpcall failed: " + reply.getErrorState());
         }
-        throw new ServiceCallFailedException("tpcall failed: " + reply.getErrorState());
+    }
+
+    private CasualManagedConnection getManagedConnection(se.laz.casual.standalone.outbound.Address address, java.util.function.Supplier<TransactionManager> transactionManagerSupplier)
+    {
+        return ManagedConnectionPool.getConnection(address, transactionManagerSupplier);
     }
 
     @Provider

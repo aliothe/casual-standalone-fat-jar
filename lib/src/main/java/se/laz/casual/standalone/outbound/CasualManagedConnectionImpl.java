@@ -22,6 +22,7 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
     private int port;
     private Caller caller;
     private Object disconnectLock = new Object();
+    private boolean closed = true;
     TransactionManager transactionManager;
 
     private CasualManagedConnectionImpl(TransactionManager transactionManager,
@@ -32,6 +33,7 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
         this.port = port;
         this.transactionManager = transactionManager;
         caller = CallerProducerImpl.of().createCaller(transactionManager, this.host, this.port, this);
+        connect();
     }
 
     public static CasualManagedConnection of(TransactionManager transactionManager,
@@ -44,11 +46,11 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
     }
 
     @Override
-    public void disconnected()
+    public void disconnected(Exception exception)
     {
         synchronized (disconnectLock)
         {
-            LOG.warning(() -> String.format("%s:%d disconnected", host, port));
+            LOG.warning(() -> String.format("%s:%d disconnected -> %s", host, port, exception));
             caller = null;
             AutoReconnect.of(this,
                     host,
@@ -71,7 +73,22 @@ public class CasualManagedConnectionImpl implements CasualManagedConnection, Net
     @Override
     public void close()
     {
-        getCaller().ifPresent(Caller::close);
+        //getCaller().ifPresent(Caller::close);
+        closed = true;
+        // TODO:
+        // Should only ever happen after current transaction is finished?
+        //LOG.info(() -> "close?" + closed);
+    }
+
+    public void connect()
+    {
+        closed = false;
+    }
+
+    public boolean isClosed()
+    {
+        //LOG.info(() -> "connection isClosed?" + closed + " => " + this);
+        return closed;
     }
 
     @Override

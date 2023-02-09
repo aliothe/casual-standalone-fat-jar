@@ -5,7 +5,10 @@
  */
 package se.laz.casual.standalone;
 
+import javax.transaction.Status;
+import javax.transaction.Synchronization;
 import javax.transaction.SystemException;
+import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAResource;
 import java.util.Objects;
@@ -19,7 +22,7 @@ public class TransactionWrapper
 {
     private static final Logger LOG = Logger.getLogger(TransactionWrapper.class.getName());
     private final TransactionManager transactionManager;
-    private final Object transactLock = new Object();
+    private final Object transactionLock = new Object();
 
     private TransactionWrapper(TransactionManager transactionManager)
     {
@@ -34,29 +37,72 @@ public class TransactionWrapper
 
     public <T> T execute(Supplier<T> supplier, XAResource xaResource)
     {
-        synchronized (transactLock)
+        try
         {
-            try
+            if( null == transactionManager.getTransaction() )
             {
-                transactionManager.getTransaction().enlistResource(xaResource);
+                return supplier.get();
+            }
+            synchronized (transactionLock)
+            {
+                if (!transactionManager.getTransaction().enlistResource(xaResource))
+                {
+                    throw new TransactionException("could not enlist resource!");
+                }
                 T answer = supplier.get();
-                transactionManager.getTransaction().delistResource(xaResource, TMSUCCESS);
+                if (!transactionManager.getTransaction().delistResource(xaResource, TMSUCCESS))
+                {
+                    throw new TransactionException("could not delist resource!");
+                }
                 return answer;
             }
-            catch (Exception e)
+        }
+        catch (Exception e)
+        {
+            LOG.log(Level.WARNING, e, () -> "transaction exception - will try to set rollback only");
+            try
             {
-                LOG.log(Level.WARNING, e, () -> "transaction exception - will try to set rollback only");
-                try
-                {
-                    transactionManager.setRollbackOnly();
-                    throw new TransactionException(e);
-                }
-                catch (SystemException ex)
-                {
-                    throw new TransactionException("failed setRollbackOnly",e);
-                }
+                transactionManager.setRollbackOnly();
+                throw new TransactionException(e);
+            }
+            catch (SystemException ex)
+            {
+                throw new TransactionException("failed setRollbackOnly",e);
             }
         }
     }
 
+    private static class XASynchronization implements Synchronization
+    {
+        private final Transaction transaction;
+        private final XAResource xaResource;
+        private XASynchronization(Transaction transaction, XAResource xaResource)
+        {
+            this.transaction = transaction;
+            this.xaResource = xaResource;
+        }
+        public static XASynchronization of(Transaction transaction, XAResource xaResource)
+        {
+            Objects.requireNonNull(transaction, "transaction can not be null");
+            Objects.requireNonNull(xaResource, "xaResource can not be null");
+            return new XASynchronization(transaction, xaResource);
+        }
+
+        @Override
+        public void beforeCompletion()
+        {
+            // NOP
+        }
+
+        @Override
+        public void afterCompletion(int status)
+        {
+            if( status == Status.STATUS_COMMITTED )
+            {
+                LOG.log(Level.INFO, () -> "afterCompletion: Status.STATUS_COMMITTED" );
+                return;
+            }
+            LOG.severe(() -> "Transaction: " + transaction + ", xaResource: " + xaResource + " NOT COMMITED, status: " + status);
+        }
+    }
 }

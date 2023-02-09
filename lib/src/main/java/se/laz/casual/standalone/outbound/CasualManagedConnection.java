@@ -8,7 +8,7 @@ package se.laz.casual.standalone.outbound;
 
 import java.util.Optional;
 
-public interface CasualManagedConnection
+public interface CasualManagedConnection extends AutoCloseable
 {
     Optional<Caller> getCaller();
     void close();

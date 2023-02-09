@@ -26,6 +26,7 @@ import se.laz.casual.network.outbound.NettyNetworkConnection;
 import se.laz.casual.network.outbound.NetworkListener;
 import se.laz.casual.standalone.CasualXAResource;
 import se.laz.casual.standalone.TransactionWrapper;
+import se.laz.casual.standalone.outbound.network.pool.NetworkPoolHandler;
 
 import javax.transaction.TransactionManager;
 import javax.transaction.xa.XAResource;
@@ -65,24 +66,18 @@ public class CallerImpl implements Caller
         Objects.requireNonNull(domainId, "domainId can not be null");
         Objects.requireNonNull(domainName, "domainName can not be null");
         Objects.requireNonNull(networkListener, "networkListener can not be null");
-        NetworkConnection networkConnection = createNetworkConnection(address, protocolVersion, domainId, domainName, networkListener);
+        NetworkConnection networkConnection = NetworkPoolHandler.getInstance()
+                                                                .getOrCreate(
+                                  String.format("%s:%s", address.getHostName(), address.getPort()),
+                                  Address.of(address.getHostName(), address.getPort()),
+                                  protocolVersion,
+                                  networkListener,
+                                  1);
         CasualConnection casualConnection = CasualConnection.of(networkConnection);
         CasualXAResource casualXAResource = CasualXAResource.of(casualConnection, resourceManagerId);
         casualConnection.setCasualXAResource(casualXAResource);
         NetworkListenerAdapter proxyNetworkListener = NetworkListenerAdapter.of(networkListener);
         return new CallerImpl(casualConnection, ServiceCallerImpl.of(casualConnection), QueueCallerImpl.of(casualConnection), proxyNetworkListener, transactionManager);
-    }
-
-    private static NetworkConnection createNetworkConnection(InetSocketAddress address, ProtocolVersion protocolVersion, UUID domainId, String domainName, NetworkListener networkListener)
-    {
-        NettyConnectionInformation connectionInformation = NettyConnectionInformation.createBuilder()
-                                                                                          .withDomainId(domainId)
-                                                                                          .withDomainName(domainName)
-                                                                                          .withAddress(address)
-                                                                                          .withProtocolVersion(protocolVersion)
-                                                                                          .withCorrelator(CorrelatorImpl.of())
-                                                                                          .build();
-        return NettyNetworkConnection.of(connectionInformation, networkListener);
     }
 
     @Override
@@ -314,10 +309,10 @@ public class CallerImpl implements Caller
         }
 
         @Override
-        public void disconnected()
+        public void disconnected(Exception exception)
         {
             disconnected = false;
-            networkListener.disconnected();
+            networkListener.disconnected(exception);
         }
 
         public boolean isDisconnected()
