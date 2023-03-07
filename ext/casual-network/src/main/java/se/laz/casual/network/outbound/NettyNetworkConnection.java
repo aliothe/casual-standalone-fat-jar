@@ -15,19 +15,18 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.util.concurrent.Future;
 import se.laz.casual.api.conversation.ConversationClose;
 import se.laz.casual.api.network.protocol.messages.CasualNWMessage;
 import se.laz.casual.api.network.protocol.messages.CasualNetworkTransmittable;
+import se.laz.casual.jca.DomainId;
 import se.laz.casual.network.CasualNWMessageDecoder;
 import se.laz.casual.network.CasualNWMessageEncoder;
-import se.laz.casual.network.api.NetworkConnection;
 import se.laz.casual.network.connection.CasualConnectionException;
 import se.laz.casual.network.protocol.messages.CasualNWMessageImpl;
 import se.laz.casual.network.protocol.messages.conversation.Request;
 import se.laz.casual.network.protocol.messages.domain.CasualDomainConnectReplyMessage;
 import se.laz.casual.network.protocol.messages.domain.CasualDomainConnectRequestMessage;
-
+import se.laz.casual.network.api.NetworkConnection;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,9 +37,10 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-public final class NettyNetworkConnection implements NetworkConnection, ConversationClose
+public class NettyNetworkConnection implements NetworkConnection, ConversationClose
 {
     private static final Logger LOG = Logger.getLogger(NettyNetworkConnection.class.getName());
     private static final String LOG_HANDLER_NAME = "logHandler";
@@ -49,34 +49,46 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
     private final ConversationMessageStorage conversationMessageStorage;
     private final Channel channel;
     private final AtomicBoolean connected = new AtomicBoolean(true);
-    private final ExecutorService executorService;
-    private final UUID id = UUID.randomUUID();
+    private final Supplier<ExecutorService> managedExecutorService;
+    private final ErrorInformer errorInformer;
+    private DomainId domainId;
 
-    private NettyNetworkConnection(BaseConnectionInformation ci, Correlator correlator, Channel channel, ConversationMessageStorage conversationMessageStorage, ExecutorService executorService)
+    private NettyNetworkConnection(BaseConnectionInformation ci,
+                                   Correlator correlator,
+                                   Channel channel,
+                                   ConversationMessageStorage conversationMessageStorage,
+                                   Supplier<ExecutorService> managedExecutorService,
+                                   ErrorInformer errorInformer)
     {
         this.ci = ci;
         this.correlator = correlator;
         this.channel = channel;
         this.conversationMessageStorage = conversationMessageStorage;
-        this.executorService = executorService;
+        this.managedExecutorService = managedExecutorService;
+        this.errorInformer = errorInformer;
     }
 
     public static NetworkConnection of(final NettyConnectionInformation ci, final NetworkListener networkListener)
     {
         Objects.requireNonNull(ci, "connection info can not be null");
         Objects.requireNonNull(ci, "network listener can not be null");
+        ErrorInformer errorInformer = ErrorInformer.of(new CasualConnectionException("network connection is gone"));
+        errorInformer.addListener(networkListener);
         EventLoopGroup workerGroup = EventLoopFactory.of().getInstance();
         Correlator correlator = ci.getCorrelator();
         ConversationMessageStorage conversationMessageStorage = ConversationMessageStorageImpl.of();
-        OnNetworkError onNetworkError = channel -> NetworkErrorHandler.notifyListenerIfNotConnected(channel, networkListener);
+        OnNetworkError onNetworkError = channel -> NetworkErrorHandler.notifyListenersIfNotConnected(channel, errorInformer);
         ConversationMessageHandler conversationMessageHandler = ConversationMessageHandler.of( conversationMessageStorage);
         Channel ch = init(ci.getAddress(), workerGroup, ci.getChannelClass(), CasualMessageHandler.of(correlator), conversationMessageHandler, ExceptionHandler.of(correlator, onNetworkError), ci.isLogHandlerEnabled());
-        NettyNetworkConnection networkConnection = new NettyNetworkConnection(ci, correlator, ch, conversationMessageStorage, EventLoopFactory.getExecutorService());
+        NettyNetworkConnection networkConnection = new NettyNetworkConnection(ci, correlator, ch, conversationMessageStorage, () -> EventLoopFactory.getExecutorService(), errorInformer);
         LOG.finest(() -> networkConnection + " connected to: " + ci.getAddress());
-        ch.closeFuture().addListener(f -> handleClose(f, networkConnection, networkListener));
-        networkConnection.throwIfProtocolVersionNotSupportedByEIS(ci.getProtocolVersion(), ci.getDomainId(), ci.getDomainName());
+        ch.closeFuture().addListener(f -> handleClose(networkConnection, errorInformer));
+        DomainId id = networkConnection.throwIfProtocolVersionNotSupportedByEIS(ci.getProtocolVersion(), ci.getDomainId(), ci.getDomainName());
+        networkConnection.setDomainId(id);
         return networkConnection;
     }
+
+
 
     private static Channel init(final InetSocketAddress address, final EventLoopGroup workerGroup, Class<? extends Channel> channelClass, final CasualMessageHandler messageHandler, ConversationMessageHandler conversationMessageHandler, ExceptionHandler exceptionHandler, boolean enableLogHandler)
     {
@@ -101,18 +113,17 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
         return b.connect(address).syncUninterruptibly().channel();
     }
 
-    private static void handleClose(Future<? super Void> future, final NettyNetworkConnection c, NetworkListener networkListener)
+    private static void handleClose(final NettyNetworkConnection connection, ErrorInformer errorInformer)
     {
         // always complete any outstanding requests exceptionally
         // both when the casual domain goes away or when the owner of the network connection
         // closes us, the client, directly
-        LOG.warning(() -> "connection closed: " + future.cause());
-        c.correlator.completeAllExceptionally(new CasualConnectionException("network connection is gone: " + future.cause()));
-        if(c.connected.get())
+        connection.correlator.completeAllExceptionally(new CasualConnectionException("network connection is gone"));
+        if(connection.connected.get())
         {
             // only inform on casual disconnect
             // will result in a close call on the ManagedConnection ( by the application server)
-            networkListener.disconnected();
+            errorInformer.inform();
         }
     }
 
@@ -135,7 +146,11 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
                 List<UUID> l = new ArrayList<>();
                 l.add(message.getCorrelationId());
                 LOG.finest(() -> String.format("failed request: %s", LogTool.asLogEntry(message)));
-                correlator.completeExceptionally(l, new CasualConnectionException(cf.cause()));
+                // This since all outstanding requests may already have been completed exceptionally
+                if(!f.isCompletedExceptionally())
+                {
+                    correlator.completeExceptionally(l, new CasualConnectionException(cf.cause()));
+                }
             }// successful correlation is done in CasualMessageHandler
         });
         return f;
@@ -168,7 +183,7 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
         maybeMessage.ifPresent(future::complete);
         if(!future.isDone())
         {
-            executorService.execute(() -> future.complete(conversationMessageStorage.takeFirst(corrid)));
+            managedExecutorService.get().execute(() -> future.complete(conversationMessageStorage.takeFirst(corrid)));
         }
         return future;
     }
@@ -182,12 +197,23 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
     }
 
     @Override
-    public UUID getId()
+    public boolean isActive()
     {
-        return id;
+        return channel.isActive();
     }
 
-    private void throwIfProtocolVersionNotSupportedByEIS(long version, final UUID domainId, final String domainName)
+    @Override
+    public DomainId getDomainId()
+    {
+        return domainId;
+    }
+
+    private void setDomainId(DomainId domainId)
+    {
+        this.domainId = domainId;
+    }
+
+    private DomainId throwIfProtocolVersionNotSupportedByEIS(long version, final UUID domainId, final String domainName)
     {
         CasualDomainConnectRequestMessage requestMessage = CasualDomainConnectRequestMessage.createBuilder()
                                                                                             .withExecution(UUID.randomUUID())
@@ -206,22 +232,56 @@ public final class NettyNetworkConnection implements NetworkConnection, Conversa
             LOG.warning(() -> "protocol version mismatch, requesting:  " + version + " reply version: " + replyEnvelope.getMessage().getProtocolVersion());
             throw new CasualConnectionException("wanted protocol version " + version + " is not supported by casual.\n Casual suggested protocol version " + replyEnvelope.getMessage().getProtocolVersion());
         }
+        return DomainId.of(replyEnvelope.getMessage().getDomainId());
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass())
+        {
+            return false;
+        }
+        NettyNetworkConnection that = (NettyNetworkConnection) o;
+        return Objects.equals(channel, that.channel) && Objects.equals(getDomainId(), that.getDomainId());
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(channel, getDomainId());
     }
 
     @Override
     public String toString()
     {
-        final StringBuilder sb = new StringBuilder("NettyNetworkConnection{");
-        sb.append("ci=").append(ci);
-        sb.append(", correlator=").append(correlator);
-        sb.append(", channel=").append(channel);
-        sb.append('}');
-        return sb.toString();
+        return "NettyNetworkConnection{" +
+                "ci=" + ci +
+                "correlator=" + correlator +
+                ", channel=" + channel +
+                ", domainId=" + domainId +
+                '}';
     }
+
+    @Override
+    public ConversationClose getConversationClose()
+    {
+        return this::close;
+    }
+
 
     @Override
     public void close(UUID conversationalCorrId)
     {
         ConversationMessageStorageImpl.remove(conversationalCorrId);
     }
+
+   public void addListener(NetworkListener listener)
+   {
+       errorInformer.addListener(listener);
+   }
 }

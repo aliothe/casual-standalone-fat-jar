@@ -15,7 +15,6 @@ dependencies {
     api project(':ext:casual-network')
     compileOnly 'javax.transaction:transaction-api:1.1'
 
-    
     // for spock
     testImplementation libs.groovy_all
     testImplementation libs.spock_core
