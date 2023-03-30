@@ -1,6 +1,0 @@
-{
-  "outbound":
-  {
-    "managedExecutorServiceName": "java:comp/env/concurrent/casualManagedExecutorService"
-  }
-}

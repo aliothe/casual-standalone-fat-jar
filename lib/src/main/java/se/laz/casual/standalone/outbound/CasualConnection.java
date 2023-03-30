@@ -6,13 +6,12 @@
 
 package se.laz.casual.standalone.outbound;
 
+import se.laz.casual.internal.network.NetworkConnection;
 import se.laz.casual.jca.DomainId;
-import se.laz.casual.network.api.NetworkConnection;
 import se.laz.casual.standalone.CasualXAResource;
 
 import javax.transaction.xa.Xid;
 import java.util.Objects;
-import java.util.UUID;
 
 public class CasualConnection
 {

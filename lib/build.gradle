@@ -9,10 +9,11 @@ repositories {
 }
 
 dependencies {
-    api project(':ext:casual-api')
-    api project(':ext:casual-network-protocol')
-    api project(':ext:casual-network-api')
-    api project(':ext:casual-network')
+    api libs.casual_api
+    api libs.casual_network_protocol
+    api libs.casual_internal
+    api libs.casual_network
+    api libs.javaee_api
     compileOnly 'javax.transaction:transaction-api:1.1'
 
     // for spock
