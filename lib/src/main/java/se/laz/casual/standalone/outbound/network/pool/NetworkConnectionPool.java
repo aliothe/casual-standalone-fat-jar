@@ -5,6 +5,7 @@
  */
 package se.laz.casual.standalone.outbound.network.pool;
 
+import se.laz.casual.internal.network.NetworkConnection;
 import se.laz.casual.jca.CasualResourceAdapterException;
 import se.laz.casual.network.ProtocolVersion;
 import se.laz.casual.network.connection.CasualConnectionException;
@@ -13,7 +14,7 @@ import se.laz.casual.network.outbound.NettyConnectionInformationCreator;
 import se.laz.casual.network.outbound.NettyNetworkConnection;
 import se.laz.casual.network.outbound.NetworkListener;
 import se.laz.casual.standalone.outbound.Address;
-import se.laz.casual.network.api.NetworkConnection;
+
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;

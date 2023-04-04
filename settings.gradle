@@ -9,7 +9,7 @@
 
 rootProject.name = 'casual-standalone-fat-jar'
 include('lib')
-include 'ext:casual-api'
-include 'ext:casual-network-protocol'
-include 'ext:casual-network-api'
-include 'ext:casual-network'
+//include 'ext:casual-api'
+//include 'ext:casual-network-protocol'
+//include 'ext:casual-network-api'
+//include 'ext:casual-network'

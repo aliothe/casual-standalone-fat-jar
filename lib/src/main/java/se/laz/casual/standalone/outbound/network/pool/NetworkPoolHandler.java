@@ -5,7 +5,7 @@
  */
 package se.laz.casual.standalone.outbound.network.pool;
 
-import se.laz.casual.network.api.NetworkConnection;
+import se.laz.casual.internal.network.NetworkConnection;
 import se.laz.casual.network.ProtocolVersion;
 import se.laz.casual.network.connection.CasualConnectionException;
 import se.laz.casual.network.outbound.NetworkListener;
